@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useContext, createContext } from "react";
 
 /* ==========================================================================
-   SABETTA IN PIAZZA — app mobile (iOS / Android) per la spesa di frutta e verdura
+   SABETTA IN PIAZZA — app mobile Android per la spesa di frutta e verdura
    --------------------------------------------------------------------------
    Vista cliente  : banco, prodotto, carrello, cassa, ordini, assistente Betta, profilo
    Vista negozio  : coda ordini, pesata, merce del giorno con MODALITÀ AGGIORNAMENTO
                     (freeze + bozza + pubblicazione), fasce di consegna, andamento
-   Assistente     : "Betta", Q&A con AI, con motore locale di riserva e passaggio
-                    al telefono del negozio quando serve una persona
+   Assistente     : "Betta", risposte locali (domande frequenti e dati del banco) e
+                    passaggio al telefono del negozio quando serve una persona
    Nessuna dipendenza esterna. Persistenza opzionale via window.storage.
    ========================================================================== */
 
@@ -555,7 +555,6 @@ const useApp = () => useContext(Ctx);
 
 /* =================================== ROOT ================================= */
 export default function SabettaApp() {
-  const [piatt, setPiatt] = useState("ios");
   const [pronto, setPronto] = useState(false);
 
   /* dati */
@@ -606,7 +605,6 @@ export default function SabettaApp() {
       l.href = "https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..800&display=swap";
       document.head.appendChild(l);
     }
-    if (typeof navigator !== "undefined" && /android/i.test(navigator.userAgent || "")) setPiatt("android");
   }, []);
 
   /* caricamento e salvataggio */
@@ -906,7 +904,7 @@ export default function SabettaApp() {
   }
 
   const vale = {
-    piatt, setPiatt, grande, setGrande, dimmi, avviso,
+    grande, setGrande, dimmi, avviso,
     catalogo, setCatalogo, bozza, setBozza, freeze, setFreeze, apriFreeze, pubblicaBanco, annullaBozza,
     carrello, aggiungi, togli, setPref, righe, parziale, pezzi, mancano, okMinimo,
     preferiti, toggleFav, ordini, setOrdini, creaOrdine, statoOrdine, pesa, ripeti,
@@ -929,31 +927,12 @@ export default function SabettaApp() {
 
 /* =============================== telaio device ============================ */
 function Telaio({ children }) {
-  const { piatt, setPiatt, grande, avviso } = useApp();
-  const [ora, setOra] = useState(oraTxt(new Date()));
-  useEffect(() => {
-    const t = setInterval(() => setOra(oraTxt(new Date())), 20000);
-    return () => clearInterval(t);
-  }, []);
-
+  const { grande, avviso } = useApp();
   return (
-    <div className={`sab ${piatt} ${grande ? "grande" : ""}`}>
+    <div className={`sab android ${grande ? "grande" : ""}`}>
       <style>{CSS}</style>
       <div className="tela">
-        <div className="selettore">
-          <button className={`sceltab ${piatt === "ios" ? "on" : ""}`} onClick={() => setPiatt("ios")}>iPhone</button>
-          <button className={`sceltab ${piatt === "android" ? "on" : ""}`} onClick={() => setPiatt("android")}>Android</button>
-        </div>
-
         <div className="telefono">
-          <div className="stato">
-            <span>{ora}</span>
-            <span className="tacca" />
-            <span className="segnali">
-              <svg width="17" height="11" viewBox="0 0 17 11" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor" /><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor" /><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor" /><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" /></svg>
-              <svg width="25" height="12" viewBox="0 0 25 12" aria-hidden="true"><rect x="0.6" y="0.6" width="20" height="10.8" rx="3" stroke="currentColor" fill="none" opacity=".5" /><rect x="2.2" y="2.2" width="15" height="7.6" rx="1.8" fill="currentColor" /><path d="M22.4 4v4c1-.4 1.6-1 1.6-2s-.6-1.6-1.6-2z" fill="currentColor" opacity=".5" /></svg>
-            </span>
-          </div>
           <div className="vetro">{children}</div>
         </div>
       </div>
@@ -964,13 +943,12 @@ function Telaio({ children }) {
 
 /* ============================== pezzi riusabili =========================== */
 function Testata({ titolo, sotto, indietro, destra, verde = true }) {
-  const { piatt } = useApp();
   return (
     <header className={`testata ${verde ? "" : "chiara"}`}>
       <div className="testariga">
         {indietro && (
           <button className="tondino" onClick={indietro} aria-label="Indietro">
-            {piatt === "ios" ? <I.chevron s={24} /> : <I.freccia s={22} />}
+            <I.freccia s={22} />
           </button>
         )}
         <div className={`testatitolo ${indietro ? "conindietro" : ""}`}>
@@ -2085,72 +2063,206 @@ function SchermoOrdine({ id }) {
 }
 
 /* ================================== BETTA ================================= */
-const FAQ = [
-  { k: ["consegna", "spedizione", "costo", "quanto costa portare", "gratis"], r: () => `La consegna costa ${eur(COSTO_CONSEGNA)} ed è gratis sopra ${eur(CONSEGNA_GRATIS_DA)} di spesa. Se preferisci, puoi ritirare in negozio senza costi.` },
-  { k: ["minimo", "spesa minima"], r: () => `L'ordine minimo è ${eur(MIN_ORDINE)}. Sotto questa cifra il carrello non si può confermare.` },
-  { k: ["orario", "orari", "che ora", "fino a che ora", "aperto", "chiuso", "domenica"], r: () => `Consegniamo tutti i giorni dalle 8:00 alle 20:00, con fasce di un'ora. La domenica siamo chiusi.` },
-  { k: ["prenot", "domani", "settimana", "in anticipo", "programm"], r: () => `Puoi prenotare fino a sette giorni prima: scegli il giorno e la fascia oraria alla cassa. Puoi anche far ripetere lo stesso ordine ogni settimana.` },
-  { k: ["pagare", "pagamento", "carta", "contanti", "bancomat", "pos"], r: () => `Puoi pagare in contanti alla consegna, con bancomat o carta al fattorino, oppure subito in app con la carta.` },
-  { k: ["ritiro", "venire a prendere", "passo io", "negozio"], r: () => `Certo: scegli "Ritiro in negozio" alla cassa. Ci trovi in ${NEGOZIO}, senza costi aggiuntivi.` },
-  { k: ["fresco", "qualità", "provenienza", "dove prendete", "biologico"], r: () => `Scegliamo la merce ogni mattina al mercato e lavoriamo soprattutto con produttori della zona. Sulla scheda di ogni prodotto trovi la provenienza.` },
-  { k: ["sostituzione", "manca", "esaurito", "finito"], r: () => `Alla cassa dici cosa fare se un prodotto manca: sostituirlo con uno simile, chiamarti prima, oppure toglierlo e non pagarlo.` },
-  { k: ["peso", "pesata", "chili", "quanto pesa"], r: () => `La frutta e la verdura a peso si pagano sul peso reale: pesiamo al banco e il totale si aggiorna prima della consegna.` },
-  { k: ["annullare", "disdire", "cambiare ordine", "modificare"], r: () => `Per cambiare o annullare un ordine già confermato serve una persona del negozio: chiama il ${TELEFONO}.`, azione: "chiama" },
-  { k: ["reclamo", "rotto", "marcio", "non va bene", "rimborso"], r: () => `Mi dispiace. Per i rimborsi decide il negozio: chiama il ${TELEFONO} e risolvono subito, di solito con un rimborso o una sostituzione.`, azione: "chiama" },
-  { k: ["persona", "umano", "parlare", "telefono", "chiamare", "operatore"], r: () => `Ti passo al negozio: il numero è ${TELEFONO}, rispondono negli orari di apertura.`, azione: "chiama" },
-  { k: ["zona", "consegnate a", "arrivate", "fuori citt", "provincia", "cap"], r: () => `La consegna a casa copre ${CITTA_ZONA} nel ${CAP_ZONA}. Fuori zona puoi sempre ordinare e ritirare in negozio, in ${NEGOZIO}.` },
+/* Nella prova Betta risponde solo dal telefono, con regole locali e i dati del banco:
+   niente AI (nell'app non c'è e non ci deve essere nessuna chiave).
+   Ogni argomento ha parole chiave con un peso e vince il punteggio più alto, così
+   «Fino a che ora consegnate?» va sugli orari e non sul costo della consegna.
+   A pari punteggio Betta mette insieme le due risposte. */
+const normBetta = (s) => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/[^a-z0-9]+/g, " ").trim();
+const alUnita = (u) => `${["testa", "busta", "vaschetta"].includes(u) ? "alla" : "al"} ${un(u).et}`;
+const statoBetta = (o) => (o.stato === "annullato" ? "annullato" : ((STATI.find((x) => x.id === o.stato) || {}).t || o.stato).toLowerCase());
+const NOMI_GENERICI = ["frutta", "misto"];
+const PAROLE_VUOTE = ["pero", "sugli", "sulle", "sulla", "sullo"];
+const ORTOFRUTTA_NOTA = [
+  "pesche", "ciliegie", "albicocche", "prugne", "susine", "anguria", "melone", "kiwi", "ananas", "mandarini",
+  "clementine", "fichi", "cachi", "melograno", "nespole", "broccoli", "cavolfiore", "cavolo", "verza", "finocchi",
+  "sedano", "cetrioli", "zucca", "funghi", "spinaci", "bietole", "rucola", "lattuga", "asparagi", "peperoncini",
+  "fagiolini", "piselli", "porri", "ravanelli",
 ];
 
+/* stessa parola a meno del singolare/plurale: pomodoro/pomodori, arancia/arance, mela/mele */
+function stessaParola(a, b) {
+  if (a === b) return true;
+  if (a.length < 4 || b.length < 4 || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i >= Math.min(a.length, b.length) - 1;
+}
+
+function prodottiCitati(t, catalogo) {
+  const parole = t.split(" ").filter((w) => w.length >= 3 && !PAROLE_VUOTE.includes(w));
+  const cita = (nome) => {
+    const n = normBetta(nome).split(" ");
+    if (NOMI_GENERICI.includes(n[0])) return n.slice(1).some((x) => x.length >= 5 && parole.some((w) => stessaParola(w, x)));
+    return parole.some((w) => stessaParola(w, n[0]));
+  };
+  let presenti = catalogo.filter((p) => p.attivo && cita(p.nome));
+  /* se il nome intero c'è (es. «Com'è oggi Pomodori da sugo?») vale solo quello */
+  const esatti = presenti.filter((p) => ` ${t} `.includes(` ${normBetta(p.nome)} `));
+  if (esatti.length) presenti = esatti;
+  const assenti = presenti.length ? [] : [
+    ...catalogo.filter((p) => !p.attivo && cita(p.nome)).map((p) => p.nome.toLowerCase()),
+    ...ORTOFRUTTA_NOTA.filter((x) => parole.some((w) => stessaParola(w, x))),
+  ];
+  return { presenti, assenti };
+}
+
+function rispostaProdotti(lista) {
+  if (lista.length === 1) {
+    const p = lista[0];
+    const c = p.giacenza > 0;
+    return {
+      risposta: `${p.nome}: ${eur(prezzoDi(p))} ${alUnita(p.unita)}${inOfferta(p) ? `, in offerta (−${p.sconto}%)` : ""}.${p.origine ? ` Provenienza: ${p.origine}.` : ""} ${c ? `Ne abbiamo ancora ${qtaTxt(p.unita, p.giacenza)}.` : "Purtroppo è finito per oggi."}${c && p.nota ? ` ${p.nota}` : ""}`,
+      azione: c ? "aggiungi" : "nessuna",
+      prodotti: c ? [p.id] : [],
+    };
+  }
+  const tre = lista.slice(0, 3);
+  const dispo = tre.filter((p) => p.giacenza > 0);
+  return {
+    risposta: `Oggi al banco: ${tre.map((p) => `${p.nome.toLowerCase()} ${eur(prezzoDi(p))} ${alUnita(p.unita)}${p.giacenza > 0 ? "" : " (finito)"}`).join("; ")}.${lista.length > 3 ? " Gli altri li trovi sul Banco." : ""}`,
+    azione: dispo.length ? "aggiungi" : "nessuna",
+    prodotti: dispo.map((p) => p.id),
+  };
+}
+
+function descriviOrdine(o) {
+  if (o.stato === "annullato") return { risposta: `L'ordine ${o.id} risulta annullato. Per qualsiasi dubbio chiama il negozio al ${TELEFONO}.`, azione: "chiama" };
+  if (o.stato === "consegnato") return { risposta: `L'ordine ${o.id} risulta ${o.ritiro ? "ritirato" : "consegnato"}. Se c'è qualcosa che non va, chiama il negozio al ${TELEFONO}.`, azione: "ordini" };
+  const quando = o.spedizione
+    ? `${quandoTxt(o, true)}.${o.tracking ? ` Codice spedizione: ${o.tracking}.` : ""}`
+    : `${o.ritiro ? "Ritiro" : "Consegna"} prevista: ${quandoTxt(o, true).toLowerCase()}.`;
+  return { risposta: `Il tuo ordine ${o.id} è nello stato «${statoBetta(o)}». ${quando} Se ti serve prima, chiama il negozio.`, azione: "ordini" };
+}
+
+function rispostaOrdine(app, testo) {
+  const ordini = app.ordini || [];
+  const m = String(testo || "").match(/\b(SP|PK)\s*-?\s*(\d{3,})\b/i);
+  if (m) {
+    const id = `${m[1].toUpperCase()}-${m[2]}`;
+    const o = ordini.find((x) => x.id === id);
+    return o ? descriviOrdine(o) : { risposta: `Non trovo l'ordine ${id} su questo telefono. Controlla il numero nella scheda Ordini, oppure chiama il negozio al ${TELEFONO}.`, azione: "ordini" };
+  }
+  const attivo = ordini.find((o) => ["nuovo", "preparazione", "consegna"].includes(o.stato));
+  if (attivo) return descriviOrdine(attivo);
+  if (ordini.length) return { risposta: `Adesso non hai ordini in corso. L'ultimo, ${ordini[0].id}, risulta ${statoBetta(ordini[0])}.`, azione: "ordini" };
+  return { risposta: "Da questo telefono non vedo ancora ordini. Quando ne fai uno, lo segui dalla scheda Ordini.", azione: "nessuna" };
+}
+
+function rispostaSconti(app) {
+  const oggi = dkey(new Date());
+  const attivi = (app.coupons || []).filter((c) => c.attivo && !(c.scadenza && oggi > c.scadenza));
+  const off = (app.catalogo || []).filter((x) => x.attivo && inOfferta(x)).slice(0, 3);
+  const pezzi = [];
+  if (attivi.length) pezzi.push(`Codici attivi: ${attivi.map((c) => `${c.codice} (${couponTxt(c)}${c.minimo ? ` da ${eur(c.minimo)}` : ""})`).join(", ")}. Si scrivono alla cassa, nel riquadro «Codice sconto».`);
+  if (off.length) pezzi.push(`In offerta oggi: ${off.map((x) => `${x.nome} a ${eur(prezzoDi(x))}`).join(", ")}.`);
+  return pezzi.length ? pezzi.join(" ") : "Oggi non ci sono codici sconto attivi né prodotti in offerta.";
+}
+
+/* argomenti: [espressione sul testo normalizzato, peso]. «richiede» = condizione obbligatoria */
+const ARGOMENTI = [
+  { id: "aggiornamento", solo: (app) => !!(app.freeze && app.freeze.attivo),
+    parole: [[/\b(ordinare|ordino|perche|non posso|non riesco|bloccat\w*|chius\w*|confermar\w*)\b/, 4]],
+    r: (app) => `In questo momento il banco è in aggiornamento: stiamo caricando la merce del giorno.${app.freeze.riapre ? ` Riapriamo alle ${app.freeze.riapre}.` : ""} Puoi già riempire il carrello e confermare appena riapriamo.` },
+  { id: "annulla", azione: "chiama",
+    parole: [[/\b(annull\w*|disdir\w*|disdic\w*|modific\w*)\b/, 5], [/\bcambia\w* (l |il |mio |un )?(ordin\w*|indirizzo)\b/, 5], [/\baggiung\w* (all |al )ordin\w*/, 3]],
+    r: () => `Per cambiare o annullare un ordine già confermato serve una persona del negozio: chiama il ${TELEFONO}.` },
+  { id: "reclamo", azione: "chiama",
+    parole: [[/\b(reclam\w*|rott[oaie]|marc[ie]|marcio|ammaccat\w*|rimbors\w*|lament\w*|sbagliat\w*)\b/, 5], [/\bnon (va|andava|era|erano) bene\b/, 5], [/\b(mancava|mancavano)\b/, 3]],
+    r: () => `Mi dispiace. Per i rimborsi decide il negozio: chiama il ${TELEFONO} e risolvono subito, di solito con un rimborso o una sostituzione.` },
+  { id: "ordine",
+    parole: [[/\b(ordine|ordini|mia spesa)\b/, 2], [/\b(dove|dov)\b/, 1], [/\barriv\w*/, 1], [/\b(quando arriv\w*|a che punto)\b/, 3], [/\b(traccia\w*|tracking|codice (di )?spedizione)\b/, 4], [/\b(sp|pk) ?\d{3,}\b/, 4]],
+    r: (app, testo) => rispostaOrdine(app, testo) },
+  { id: "persona", azione: "chiama",
+    parole: [[/\b(persona|umano|operator\w*|commess\w*|parlar\w* con)\b/, 3], [/\b(telefon\w*|chiama\w*|numero|whatsapp|contatt\w*)\b/, 2]],
+    r: () => `Ti passo al negozio: il numero è ${TELEFONO}, rispondono negli orari di apertura.` },
+  { id: "minimo", parole: [[/\bminim\w*/, 3]],
+    r: () => `L'ordine minimo è ${eur(MIN_ORDINE)}. Sotto questa cifra il carrello non si può confermare.` },
+  { id: "sconti", parole: [[/\b(coupon|scont\w*|promo\w*|offert\w*)\b/, 3], [/\bcodic[ei]\b/, 1]],
+    r: (app) => rispostaSconti(app) },
+  { id: "punti", parole: [[/\b(punti|tessera|fedelta|livell\w*|silver|gold|bronzo)\b/, 3]],
+    r: (app) => `Con la tessera prendi ${PUNTI_PER_EURO} punto per ogni euro più ${PUNTI_PER_ORDINE} a ordine, accreditati a consegna avvenuta; ${PUNTI_BUONO} punti valgono ${eur(VALORE_BUONO)}.${app.utente ? ` Adesso hai ${app.punti} punti, livello ${app.livello.corto}.` : " La tessera la attivi gratis dal Profilo."}` },
+  { id: "pacco", parole: [[/\b(pacco|pacchi|spedi\w*|spedizion\w*|corriere|fuori regione|tutta italia|al nord|da giu)\b/, 3]],
+    r: () => `Con il Pacco da giù spediamo in tutta Italia con corriere: ${ZONE_SPEDIZIONE.map((z) => `${z.t.toLowerCase()} ${eur(z.costo)}`).join(", ")}, gratis da ${eur(SPEDIZIONE_GRATIS_DA)}. Lo trovi nella scheda «Pacco».` },
+  { id: "zona",
+    parole: [[new RegExp(`\\b(zona|zone|cap|provincia|paese|paesi|fuori|quartier\\w*|frazion\\w*|${CAP_ZONA})\\b`), 3], [new RegExp(`\\b((consegnate|arrivate|venite|portate|consegnare|consegna) (a|ad|fino a)|${normBetta(CITTA_ZONA)})\\b`), 2]],
+    r: () => `La consegna a casa copre ${CITTA_ZONA} nel ${CAP_ZONA}. Fuori zona puoi sempre ordinare e ritirare in negozio, in ${NEGOZIO}.` },
+  { id: "orari",
+    parole: [[/\b(orari|orario|che ora|che ore|aperti|aperto|aprite|chiuso|chiusi|chiudete|domenica|festiv\w*|fasci[ae])\b/, 3], [/\b(stasera|stamattina|pomeriggio|mattina|sera|entro le|alle \d+)\b/, 2]],
+    r: (app) => {
+      const oggi = new Date();
+      const chiusoOggi = oggi.getDay() === GIORNO_CHIUSO || (app.giorniChiusi || []).includes(dkey(oggi));
+      return `Consegniamo tutti i giorni dalle ${APERTURA}:00 alle ${CHIUSURA}:00, con fasce di un'ora. La domenica siamo chiusi.${chiusoOggi ? " Oggi siamo chiusi, ma puoi già prenotare per i prossimi giorni." : ""}`;
+    } },
+  { id: "prenota",
+    parole: [[/\bprenot\w*/, 3], [/\b(domani|dopodomani|in anticipo|programm\w*|prossima settimana|settimana prossima|un altro giorno|lunedi|martedi|mercoledi|giovedi|venerdi|sabato)\b/, 3]],
+    r: () => `Puoi prenotare fino a sette giorni prima: scegli il giorno e la fascia oraria alla cassa. Puoi anche far ripetere lo stesso ordine ogni settimana.` },
+  { id: "ritiro", parole: [[/\b(ritir\w*|venire a prendere|vengo a prendere|passo a prendere|passo io|vengo io|prendo io)\b/, 3]],
+    r: () => `Certo: scegli "Ritiro in negozio" alla cassa. Ci trovi in ${NEGOZIO}, senza costi aggiuntivi.` },
+  { id: "dove", parole: [[/\b(dove siete|dove state|dove si trova|dove vi trovo|dov e il negozio|dove e il negozio|indirizzo)\b/, 3], [/\bnegozio\b/, 1]],
+    r: () => `Ci trovi in ${NEGOZIO}. Il telefono del negozio è ${TELEFONO}.` },
+  { id: "pagamento", parole: [[/\b(pagar\w*|pago|paghi|pagament\w*|carta|carte|contant\w*|bancomat|pos|satispay|bonifico|paypal)\b/, 3]],
+    r: () => `Puoi pagare in contanti alla consegna, con bancomat o carta al fattorino, oppure subito in app con la carta.` },
+  { id: "consegna", richiede: /\b(consegn\w*|domicilio|a casa|portate|portare|portarmi|gratis|gratuit\w*)\b/,
+    parole: [[/\b(consegn\w*|domicilio|a casa|portate|portare|portarmi)\b/, 2], [/\b(costa|costo|costi|quanto|prezz\w*|spes[ae])\b/, 1], [/\b(gratis|gratuit\w*)\b/, 2]],
+    r: () => `La consegna costa ${eur(COSTO_CONSEGNA)} ed è gratis sopra ${eur(CONSEGNA_GRATIS_DA)} di spesa. Se preferisci, puoi ritirare in negozio senza costi.` },
+  { id: "sostituzione", parole: [[/\b(sostitu\w*|mancante|esaurit\w*|non c e piu|se manca|se finisce|se non c e)\b/, 3], [/\b(manca|mancano|finit[oaie])\b/, 2]],
+    r: () => `Alla cassa dici cosa fare se un prodotto manca: sostituirlo con uno simile, chiamarti prima, oppure toglierlo e non pagarlo.` },
+  { id: "peso", parole: [[/\b(peso|pesat\w*|pesar\w*|pesa|pesano|chili|chilo|kg|grammi|etto|etti)\b/, 3]],
+    r: () => `La frutta e la verdura a peso si pagano sul peso reale: pesiamo al banco e il totale si aggiorna prima della consegna.` },
+  { id: "qualita",
+    parole: [[/\b(fresc\w*|qualita|provenienz\w*|biologic\w*|bio|km 0|km zero|chilometro zero|produttor\w*|dove (li |le |la |lo )?prendete|da dove (viene|vengono|arriva|arrivano))\b/, 3], [/\b(com e|come sono|buon[aoie]?)\b/, 1]],
+    r: () => `Scegliamo la merce ogni mattina al mercato e lavoriamo soprattutto con produttori della zona. Sulla scheda di ogni prodotto trovi la provenienza.` },
+  { id: "come", parole: [[/\bcome (si |posso |faccio a |faccio |devo )?(fare )?(un |una |la )?(ordin\w*|compr\w*|spesa|usa\w*)\b/, 3], [/\bcome funziona\b/, 3]],
+    r: () => `È semplice: dal Banco tocca i prodotti che vuoi e mettili nel carrello. Poi dal Carrello vai alla cassa, scegli consegna o ritiro, giorno e fascia, e conferma.` },
+  { id: "prezzi", parole: [[/\b(costa|costano|costo|prezz\w*|listino|quanto (viene|vengono))\b/, 1]],
+    r: () => `I prezzi di oggi li trovi sul Banco, sotto ogni prodotto. Dimmi il nome di quello che ti interessa e ti dico prezzo e disponibilità.` },
+  { id: "aiuto", parole: [[/\b(aiut\w*|chi sei|cosa sai|cosa puoi|che sai fare|cosa fai|help|informazion\w*|info)\b/, 2]],
+    r: () => `Posso dirti prezzi e disponibilità di oggi, costo e orari della consegna, zona coperta, codici sconto, punti della tessera e a che punto è il tuo ordine. Per tutto il resto ti passo il negozio.` },
+  { id: "saluto", parole: [[/\b(ciao|salve|buongiorno|buonasera|buon pomeriggio|ehi|hey)\b/, 1]],
+    r: () => `Ciao! Dimmi pure: prezzi, consegne, orari, sconti o il tuo ordine.` },
+  { id: "grazie", parole: [[/\b(grazie|gentilissim\w*|perfetto|ottimo)\b/, 1], [/^(ok|okay|va bene|bene)$/, 1]],
+    r: () => `Figurati! Se ti serve altro, sono qui.` },
+];
+
+function nonSo(app) {
+  const gia = (app.chat || []).filter((m) => m.chi === "betta" && m.nonSo).length;
+  return gia % 2 === 0
+    ? { risposta: `Su questo non ho una risposta sicura e non voglio dirti una cosa sbagliata. Posso aiutarti con prezzi, consegna, orari, sconti e i tuoi ordini; per il resto chiama il negozio al ${TELEFONO}.`, azione: "chiama", nonSo: true }
+    : { risposta: `Non ho capito bene. Prova con parole semplici, per esempio «quanto costano le fragole?» o «consegnate di domenica?». Se preferisci, chiama il negozio al ${TELEFONO}.`, azione: "chiama", nonSo: true };
+}
+
 function rispostaLocale(testo, app) {
-  const t = (testo || "").toLowerCase();
-  const attivo = app.ordini.find((o) => ["nuovo", "preparazione", "consegna"].includes(o.stato));
-
-  if (/(ordine|consegna mia|dov|arriv|trac|quando arriva)/.test(t) && attivo) {
-    const s = STATI.find((x) => x.id === attivo.stato);
-    const quando = quandoTxt(attivo, true).toLowerCase();
-    return { risposta: `Il tuo ordine ${attivo.id} è nello stato "${s.t}". La consegna è prevista ${quando}. Se ti serve prima, chiama il negozio.`, azione: "ordini" };
+  const t = normBetta(testo);
+  const candidati = [];
+  if (t) {
+    ARGOMENTI.forEach((a) => {
+      if (a.solo && !a.solo(app)) return;
+      if (a.richiede && !a.richiede.test(t)) return;
+      const s = a.parole.reduce((tot, [re, peso]) => (re.test(t) ? tot + peso : tot), 0);
+      if (s > 0) candidati.push({ s, a });
+    });
+    const { presenti, assenti } = prodottiCitati(t, app.catalogo || []);
+    if (presenti.length) candidati.push({ s: 4, a: { r: () => rispostaProdotti(presenti) } });
+    else if (assenti.length) candidati.push({ s: 3, a: { r: () => `Oggi non abbiamo ${assenti.slice(0, 2).join(" né ")} al banco. Quello che c'è oggi lo trovi sul Banco; per una richiesta particolare chiama il negozio.` } });
   }
-  if (app.freeze.attivo && /(ordin|perché|non posso|bloccat)/.test(t)) {
-    return { risposta: `In questo momento il banco è in aggiornamento: stiamo caricando la merce del giorno.${app.freeze.riapre ? ` Riapriamo alle ${app.freeze.riapre}.` : ""} Puoi già riempire il carrello e confermare appena riapriamo.`, azione: "nessuna" };
-  }
-  if (/(codice|coupon|sconto|buono|promo|offert)/.test(t)) {
-    const attivi = (app.coupons || []).filter((c) => c.attivo && !(c.scadenza && dkey(new Date()) > c.scadenza));
-    const off = app.catalogo.filter((x) => x.attivo && inOfferta(x)).slice(0, 3);
-    const pezzi = [];
-    if (attivi.length) pezzi.push(`Codici attivi: ${attivi.map((c) => `${c.codice} (${couponTxt(c)}${c.minimo ? ` da ${eur(c.minimo)}` : ""})`).join(", ")}. Si scrivono alla cassa, nel riquadro «Codice sconto».`);
-    if (off.length) pezzi.push(`In offerta oggi: ${off.map((x) => `${x.nome} a ${eur(prezzoDi(x))}`).join(", ")}.`);
-    if (pezzi.length) return { risposta: pezzi.join(" "), azione: "nessuna" };
-  }
-  for (const f of FAQ) {
-    if (f.k.some((k) => t.includes(k))) return { risposta: f.r(), azione: f.azione || "nessuna" };
-  }
-  const trovati = app.catalogo.filter((p) => p.attivo && t.includes(p.nome.split(" ")[0].toLowerCase()));
-  if (trovati.length) {
-    const p = trovati[0];
-    return { risposta: `Oggi ${p.nome.toLowerCase()} ${eur(p.prezzo)} al ${p.unita}, da ${p.origine}. ${p.giacenza > 0 ? `Ne abbiamo ancora ${qtaTxt(p.unita, p.giacenza)}.` : "Purtroppo è finito per oggi."}`, azione: p.giacenza > 0 ? "aggiungi" : "nessuna", prodotti: [p.id] };
-  }
-  return { risposta: `Su questo non ho una risposta sicura e non voglio dirti una cosa sbagliata. Chiama il negozio al ${TELEFONO}: ti rispondono subito.`, azione: "chiama" };
+  if (!candidati.length) return nonSo(app);
+  candidati.sort((x, y) => y.s - x.s);
+  const scelti = candidati.filter((c, i) => i < 2 && c.s === candidati[0].s);
+  const esiti = scelti.map(({ a }) => {
+    const e = a.r(app, testo);
+    return typeof e === "string" ? { risposta: e, azione: a.azione || "nessuna", prodotti: [] } : e;
+  });
+  return {
+    risposta: esiti.map((e) => e.risposta).join(" "),
+    azione: (esiti.find((e) => e.azione && e.azione !== "nessuna") || {}).azione || "nessuna",
+    prodotti: esiti.flatMap((e) => e.prodotti || []),
+  };
 }
 
-function sistemaBetta(app) {
-  const listino = app.catalogo.filter((p) => p.attivo).slice(0, 24).map((p) => `${p.id}=${p.nome} ${eur(prezzoDi(p))}/${un(p.unita).br}${inOfferta(p) ? ` (offerta -${p.sconto}%)` : ""}${p.giacenza <= 0 ? " (finito)" : ""}`).join("; ");
-  const attivo = app.ordini.find((o) => ["nuovo", "preparazione", "consegna"].includes(o.stato));
-  const ordine = attivo ? `Ordine in corso: ${attivo.id}, stato ${attivo.stato}, consegna ${quandoTxt(attivo)}, totale ${eur(attivo.totale)}.` : "Il cliente non ha ordini in corso.";
-  return [
-    "Sei Betta, l'assistente del negozio di frutta e verdura Sabetta in piazza.",
-    "Parli italiano semplice, con frasi corte, tono gentile da negoziante di quartiere. Niente elenchi lunghi, niente termini tecnici: molti clienti hanno più di 35 anni e usano poco le app.",
-    "Rispondi solo su: prodotti, prezzi, consegne, orari, prenotazioni, pagamenti, stato degli ordini, uso dell'app.",
-    "Se non sei sicura, se il cliente vuole annullare o modificare un ordine, se c'è un reclamo o un rimborso, invitalo a chiamare il negozio e usa azione \"chiama\".",
-    `Zona di consegna: solo ${CITTA_ZONA}, CAP ${CAP_ZONA}. Fuori zona resta possibile il ritiro in negozio.`,
-    `Codici sconto attivi: ${(app.coupons || []).filter((c) => c.attivo).map((c) => `${c.codice} ${couponTxt(c)}${c.minimo ? ` da ${eur(c.minimo)}` : ""}`).join("; ") || "nessuno"}. Si inseriscono alla cassa.`,
-    `Dati del negozio: indirizzo ${NEGOZIO}; telefono ${TELEFONO}; consegne tutti i giorni 8:00-20:00 a fasce di un'ora; domenica chiuso; ordine minimo ${eur(MIN_ORDINE)}; consegna ${eur(COSTO_CONSEGNA)}, gratis da ${eur(CONSEGNA_GRATIS_DA)}; ritiro in negozio gratuito; prenotazione fino a 7 giorni; pagamento in contanti, POS alla consegna o carta in app.`,
-    app.freeze.attivo ? `Attenzione: adesso il banco è in aggiornamento merce${app.freeze.riapre ? `, riapre alle ${app.freeze.riapre}` : ""}, quindi non si possono confermare ordini.` : "Il negozio accetta ordini normalmente.",
-    `Listino di oggi: ${listino}.`,
-    ordine,
-    "Rispondi SOLO con un oggetto JSON, senza testo prima o dopo e senza blocchi di codice:",
-    '{"risposta":"massimo 3 frasi","azione":"nessuna|chiama|ordini|aggiungi","prodotti":["id del listino"]}',
-  ].join("\n");
-}
+/* evita che Betta risponda due volte alla stessa domanda se si cambia scheda mentre «scrive» */
+let bettaInRisposta = 0;
 
 function SchermoBetta() {
   const app = useApp();
@@ -2159,7 +2271,7 @@ function SchermoBetta() {
   const [scrive, setScrive] = useState(false);
   const fondo = useRef(null);
 
-  const rapide = ["Quanto costa la consegna?", "Fino a che ora consegnate?", "Dov'è il mio ordine?", "Voglio parlare con una persona"];
+  const rapide = ["Quanto costa la consegna?", "Fino a che ora consegnate?", "Dov'è il mio ordine?", "Ci sono offerte oggi?", "Consegnate fuori Brindisi?", "Come funzionano i punti?", "Voglio parlare con una persona"];
 
   useEffect(() => {
     if (fondo.current && fondo.current.scrollIntoView) {
@@ -2169,34 +2281,27 @@ function SchermoBetta() {
 
   useEffect(() => {
     const ultimo = chat[chat.length - 1];
-    if (ultimo && ultimo.chi === "io" && !scrive) rispondi(ultimo.t, chat);
+    if (ultimo && ultimo.chi === "io" && bettaInRisposta !== chat.length) rispondi(ultimo.t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chat.length]);
 
-  async function rispondi(domanda, storia) {
+  /* Risposta solo locale: nessuna chiamata a servizi esterni dal telefono. */
+  function rispondi(domanda) {
+    bettaInRisposta = chat.length;
     setScrive(true);
     let esito = null;
     try {
-      const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), 20000);
-      const messaggi = storia.slice(-8).map((m) => ({ role: m.chi === "io" ? "user" : "assistant", content: m.t }));
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: ctrl.signal,
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, system: sistemaBetta(app), messages: messaggi }),
-      });
-      clearTimeout(timeout);
-      const dati = await res.json();
-      const grezzo = (dati.content || []).map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-      const pulito = grezzo.replace(/```json|```/g, "").trim();
-      try { esito = JSON.parse(pulito); } catch (e) { if (pulito) esito = { risposta: pulito, azione: "nessuna" }; }
+      esito = rispostaLocale(domanda, app);
     } catch (e) {
-      esito = null;
+      console.error("[Betta] errore nel calcolo della risposta", e);
     }
-    if (!esito || !esito.risposta) esito = rispostaLocale(domanda, app);
-    setScrive(false);
-    setChat((c) => [...c, { chi: "betta", t: esito.risposta, azione: esito.azione || "nessuna", prodotti: esito.prodotti || [] }]);
+    if (!esito || !esito.risposta) esito = nonSo(app);
+    const attesa = Math.min(1400, 450 + esito.risposta.length * 4);
+    setTimeout(() => {
+      bettaInRisposta = 0;
+      setChat((c) => [...c, { chi: "betta", t: esito.risposta, azione: esito.azione || "nessuna", prodotti: esito.prodotti || [], nonSo: !!esito.nonSo }]);
+      setScrive(false);
+    }, attesa);
   }
 
   function invia(t) {
@@ -2246,7 +2351,7 @@ function SchermoBetta() {
         <div ref={fondo} />
       </div>
 
-      {chat.length < 2 && (
+      {!scrive && (
         <div className="rapide">
           {rapide.map((r) => <button key={r} className="chip" onClick={() => invia(r)}>{r}</button>)}
         </div>
@@ -4529,14 +4634,13 @@ const CSS = `
   --verde:#1F6B45; --verde2:#12351F; --tenue:#E8F0E5;
   --carta:#F5F6F1; --bianco:#fff; --sole:#E9A81E; --inch:#4A3403;
   --rosso:#B8371F; --grigio:#67745F; --bordo:#E1E6DB;
-  --fs:16px; --r:16px; --rb:14px;
-  --f-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+  --fs:16px; --r:20px; --rb:24px;
+  --f-ui:Roboto,"Segoe UI",system-ui,sans-serif;
   --f-dis:"Archivo",var(--f-ui);
   font-family:var(--f-ui); font-size:var(--fs); color:var(--verde2);
   -webkit-font-smoothing:antialiased; font-variant-numeric:tabular-nums;
   display:flex; justify-content:center; background:#DFE4DA; min-height:100%;
 }
-.sab.android{--f-ui:Roboto,"Segoe UI",system-ui,sans-serif;--r:20px;--rb:24px}
 .sab.grande{--fs:18px}
 .sab button,.sab input,.sab select,.sab textarea{font:inherit;color:inherit}
 .sab button{border:0;background:none;cursor:pointer;text-align:left}
@@ -4544,29 +4648,11 @@ const CSS = `
 .sab :focus-visible{outline:3px solid var(--sole);outline-offset:1px}
 .sab s{opacity:.55}
 
-/* telaio */
-.tela{padding:22px 14px 30px;display:flex;flex-direction:column;align-items:center;gap:14px;width:100%}
-.selettore{display:flex;gap:6px;background:#fff;border-radius:999px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
-.sceltab{padding:8px 18px;border-radius:999px;font-size:14px;font-weight:600;color:var(--grigio)}
-.sceltab.on{background:var(--verde2);color:#fff}
-.telefono{width:392px;max-width:100%;height:812px;max-height:calc(100dvh - 90px);background:var(--carta);border-radius:44px;
-  border:11px solid #14181A;box-shadow:0 22px 50px rgba(10,25,15,.32);position:relative;overflow:hidden;display:flex;flex-direction:column}
-.sab.android .telefono{border-radius:30px;border-width:9px}
-.stato{height:40px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 24px;background:var(--verde2);color:#fff;font-size:13px;font-weight:600;position:relative;z-index:5}
-.tacca{position:absolute;left:50%;transform:translateX(-50%);top:7px;width:104px;height:26px;background:#14181A;border-radius:14px}
-.sab.android .tacca{width:12px;height:12px;border-radius:50%;top:12px}
-.segnali{display:flex;gap:6px;align-items:center}
+/* telaio: l'app occupa tutto lo schermo del telefono */
+.tela{width:100%;display:flex;flex-direction:column}
+.telefono{width:100%;height:100dvh;background:var(--carta);position:relative;overflow:hidden;display:flex;flex-direction:column}
 .vetro{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--carta);overflow:hidden}
 .schermo{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--carta);overflow:hidden;position:relative}
-.sab.ios .telefono::after{content:"";position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:130px;height:5px;border-radius:3px;background:rgba(20,24,26,.32);z-index:20;pointer-events:none}
-
-@media (max-width:820px){
-  .tela{padding:0;gap:0}
-  .selettore{position:fixed;bottom:calc(8px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:90;opacity:.92}
-  .telefono{width:100%;height:100dvh;max-height:none;border:0;border-radius:0;box-shadow:none}
-  .stato{display:none}
-  .sab.ios .telefono::after{display:none}
-}
 
 /* struttura app */
 .app{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--carta)}

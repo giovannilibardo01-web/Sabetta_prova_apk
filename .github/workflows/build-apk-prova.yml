@@ -1,7 +1,7 @@
 name: Build APK di prova
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:        # si lancia a mano dal pulsante "Run workflow"
   push:
     branches: [main]
 
